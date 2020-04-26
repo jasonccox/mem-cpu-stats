@@ -1,19 +1,48 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
-# mem-cpu-stats - Print a brief summary of memory and CPU usage at a regular
-# interval.
-#
-# Created by Jason Cox
-# github.com/jasonccox/mem-cpu-stats
-#
+# mem-cpu-stats - Print a summary of memory and CPU usage at a regular interval.
+# Author: Jason Cox
+# Repo: https://github.com/jasonccox/mem-cpu-stats
 
-MEM_WIDTH=4
+MEM_WIDTH=3
 CPU_WIDTH=4
 INTERVAL=5
+NUM_ITERS=
+COLORS=
+
+usage() {
+    echo \
+"USAGE: mem-cpu-stats [OPTIONS]
+
+Available OPTIONS:
+    -c | --colors STYLE        Colorize the bars in STYLE. Currently the only
+                               supported style is tmux. Default none.
+    -i | --interval INTERVAL   Print output every INTERVAL seconds. INTERVAL
+                               must be an integer greater than 0. Default 5.
+    -m | --mem-width WIDTH     Display the memory usage number with at least
+                               WIDTH characters. Default 3.
+    -n | --num-iters NUM       Exit after NUM intervals. An empty value is
+                               interpreted as infinity. Default infinity.
+    -p | --cpu-width WIDTH     Display the CPU usage number with at least WIDTH
+                               characters. Default 4.
+"
+}
 
 main() {
     OS="$(get_os)"
+    if [ "$OS" != linux ] && [ "$OS" != macos ]; then
+        echo "unsupported OS"
+        exit 1
+    fi
+
+    parse_options $@
+
+    n=1
     while true; do
+        if [ "$NUM_ITERS" ] && [ "$n" -gt "$NUM_ITERS" ]; then
+            break
+        fi
+
         stats="$(get_stats)"
 
         total_mem="$(echo "$stats" | awk '{print $1}')"
@@ -26,12 +55,38 @@ main() {
         used_mem_fmt="$(printf '%*.1f' $MEM_WIDTH $used_mem_gb)"
         cpu_percent_fmt="$(printf '%*.1f' $CPU_WIDTH $cpu_percent)"
 
-        mem_out="${used_mem_fmt}G $(colored_bar $mem_percent)"
-        cpu_out="${cpu_percent_fmt}% $(colored_bar $cpu_percent)"
+        mem_out="${used_mem_fmt}G $(bar $mem_percent)"
+        cpu_out="${cpu_percent_fmt}% $(bar $cpu_percent)"
 
         echo "$mem_out  $cpu_out"
 
+        n="$((n + 1))"
         sleep $(($INTERVAL - 1)) # subtract 1 because top takes 1 second
+    done
+}
+
+parse_options() {
+    while [ "$1" != "" ]; do
+        case "$1" in
+            -c | --colors ) shift
+                            COLORS="$1"
+                            ;;
+            -i | --interval ) shift
+                            INTERVAL="$1"
+                            ;;
+            -m | --mem-width ) shift
+                            MEM_WIDTH="$1"
+                            ;;
+            -p | --cpu-width ) shift
+                            CPU_WIDTH="$1"
+                            ;;
+            -n | --num-iters ) shift
+                            NUM_ITERS="$1"
+                            ;;
+            * )             usage
+                            exit 1
+        esac
+        shift
     done
 }
 
@@ -43,6 +98,7 @@ get_os() {
     esac
 }
 
+# Based on $OS, output stats as "total_mem used_mem cpu_percent". Memory in MiB.
 get_stats() {
     case "$OS" in
         linux) echo "$(get_stats_linux)" ;;
@@ -97,40 +153,46 @@ get_stats_macos() {
     echo "$total_mem $used_mem $cpu_percent"
 }
 
-color() {
-    if [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
-        echo green
-    elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
-        echo yellow
-    else
-        echo red
-    fi
-}
-
+# Output a unicode bar representing $1 out of 100. The bar will be colorized
+# according to $COLORS.
 bar() {
     if [ "$(echo "$1 <= 12.5" | bc)" = "1" ] ; then
-        echo ▁
+        b=▁
     elif [ "$(echo "$1 <= 25" | bc)" = "1" ] ; then
-        echo ▂
+        b=▂
     elif [ "$(echo "$1 <= 37.5" | bc)" = "1" ] ; then
-        echo ▃
+        b=▃
     elif [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
-        echo ▄
+        b=▄
     elif [ "$(echo "$1 <= 62.5" | bc)" = "1" ] ; then
-        echo ▅
+        b=▅
     elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
-        echo ▆
+        b=▆
     elif [ "$(echo "$1 <= 87.5" | bc)" = "1" ] ; then
-        echo ▇
+        b=▇
     else
-        echo █
+        b=█
+    fi
+
+    if [ "$COLORS" = tmux ]; then
+        echo "$(colorize_tmux $1 $b)"
+    else
+        echo "$b"
     fi
 }
 
-colored_bar() {
-    c="$(color $1)"
-    echo "#[fg="$c",bold]"$(bar $1)"#[fg=default,default]"
+# Wrap $2 in tmux styles, with the color determined by $1 out of 100.
+colorize_tmux() {
+    if [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
+        color=green
+    elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
+        color=yellow
+    else
+        color=red
+    fi
+
+    echo "#[fg=$color,bold]$2#[fg=default,default]"
 }
 
-main
+main $@
 
