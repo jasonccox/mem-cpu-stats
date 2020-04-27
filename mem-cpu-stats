@@ -30,33 +30,29 @@ Available OPTIONS:
 
 main() {
     OS="$(get_os)"
-    if [ "$OS" != linux ] && [ "$OS" != macos ]; then
+    if [ "$OS" = other ]; then
         echo "unsupported OS"
         exit 1
     fi
 
     parse_options $@
 
-    n=1
-    while true; do
-        if [ "$NUM_ITERS" ] && [ "$n" -gt "$NUM_ITERS" ]; then
-            break
-        fi
+    local n=0
+    while [ -z "$NUM_ITERS" ] || [ "$n" -lt "$NUM_ITERS" ]; do
+        local stats="$(get_stats)"
 
-        stats="$(get_stats)"
+        local total_mem="$(echo "$stats" | awk '{print $1}')"
+        local used_mem="$(echo "$stats" | awk '{print $2}')"
+        local cpu_percent="$(echo "$stats" | awk '{print $3}')"
 
-        total_mem="$(echo "$stats" | awk '{print $1}')"
-        used_mem="$(echo "$stats" | awk '{print $2}')"
-        cpu_percent="$(echo "$stats" | awk '{print $3}')"
+        local used_mem_gb="$(echo "scale=1; $used_mem / 1024" | bc)"
+        local mem_percent="$(echo "scale=1; $used_mem * 100 / $total_mem" | bc)"
 
-        used_mem_gb="$(echo "scale=1; $used_mem / 1024" | bc)"
-        mem_percent="$(echo "scale=1; $used_mem * 100 / $total_mem" | bc)"
+        local used_mem_fmt="$(printf '%*.1f' $MEM_WIDTH $used_mem_gb)"
+        local cpu_percent_fmt="$(printf '%*.1f' $CPU_WIDTH $cpu_percent)"
 
-        used_mem_fmt="$(printf '%*.1f' $MEM_WIDTH $used_mem_gb)"
-        cpu_percent_fmt="$(printf '%*.1f' $CPU_WIDTH $cpu_percent)"
-
-        mem_out="${used_mem_fmt}G $(bar $mem_percent)"
-        cpu_out="${cpu_percent_fmt}% $(bar $cpu_percent)"
+        local mem_out="${used_mem_fmt}G $(bar $mem_percent)"
+        local cpu_out="${cpu_percent_fmt}% $(bar $cpu_percent)"
 
         echo "$mem_out  $cpu_out"
 
@@ -68,23 +64,29 @@ main() {
 parse_options() {
     while [ "$1" != "" ]; do
         case "$1" in
-            -c | --colors ) shift
-                            COLORS="$1"
-                            ;;
-            -i | --interval ) shift
-                            INTERVAL="$1"
-                            ;;
-            -m | --mem-width ) shift
-                            MEM_WIDTH="$1"
-                            ;;
-            -p | --cpu-width ) shift
-                            CPU_WIDTH="$1"
-                            ;;
-            -n | --num-iters ) shift
-                            NUM_ITERS="$1"
-                            ;;
-            * )             usage
-                            exit 1
+            -c | --colors )
+                shift
+                COLORS="$1"
+                ;;
+            -i | --interval )
+                shift
+                INTERVAL="$1"
+                ;;
+            -m | --mem-width )
+                shift
+                MEM_WIDTH="$1"
+                ;;
+            -p | --cpu-width )
+                shift
+                CPU_WIDTH="$1"
+                ;;
+            -n | --num-iters )
+                shift
+                NUM_ITERS="$1"
+                ;;
+            * )
+                usage
+                exit 1
         esac
         shift
     done
@@ -103,52 +105,51 @@ get_stats() {
     case "$OS" in
         linux) echo "$(get_stats_linux)" ;;
         macos) echo "$(get_stats_macos)" ;;
-        *) echo "" ;;
     esac
 }
 
 get_stats_linux() {
-    top_out="$(top -b -n 2 -d 1 -w 512)"
+    local top_out="$(top -b -n 2 -d 1 -w 512)"
 
-    mem_row="$(echo "$top_out" | grep "MiB Mem" | tail -n 1)"
-    cpu_row="$(echo "$top_out" | grep "%Cpu(s)" | tail -n 1)"
+    local mem_row="$(echo "$top_out" | grep "MiB Mem" | tail -n 1)"
+    local cpu_row="$(echo "$top_out" | grep "%Cpu(s)" | tail -n 1)"
 
-    total_mem="$(echo "$mem_row" | awk '{print $4}')"
-    used_mem="$(echo "$mem_row" | awk '{print $8}')"
+    local total_mem="$(echo "$mem_row" | awk '{print $4}')"
+    local used_mem="$(echo "$mem_row" | awk '{print $8}')"
 
-    cpu_user="$(echo "$cpu_row" | awk '{print $2}')"
-    cpu_sys="$(echo "$cpu_row" | awk '{print $4}')"
+    local cpu_user="$(echo "$cpu_row" | awk '{print $2}')"
+    local cpu_sys="$(echo "$cpu_row" | awk '{print $4}')"
 
-    cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
+    local cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
 
     echo "$total_mem $used_mem $cpu_percent"
 }
 
 get_stats_macos() {
-    top_out="$(top -l 2 -i 1 -n 0)"
-    vm_stat_out="$(vm_stat)"
+    local top_out="$(top -l 2 -i 1 -n 0)"
+    local vm_stat_out="$(vm_stat)"
 
-    page_size="$(echo "$vm_stat_out" | grep "page size of" | sed 's/[^0-9]//g')"
-    free="$(echo "$vm_stat_out" | grep "Pages free" | sed 's/[^0-9]//g')"
-    active="$(echo "$vm_stat_out" | grep "Pages active" | sed 's/[^0-9]//g')"
-    inactive="$(echo "$vm_stat_out" | grep "Pages inactive" | sed 's/[^0-9]//g')"
-    speculative="$(echo "$vm_stat_out" | grep "Pages speculative" | sed 's/[^0-9]//g')"
-    wired="$(echo "$vm_stat_out" | grep "Pages wired down" | sed 's/[^0-9]//g')"
-    compressed="$(echo "$vm_stat_out" | grep "Pages occupied by compressor" | sed 's/[^0-9]//g')"
+    local page_size="$(echo "$vm_stat_out" | grep "page size of" | sed 's/[^0-9]//g')"
+    local free="$(echo "$vm_stat_out" | grep "Pages free" | sed 's/[^0-9]//g')"
+    local active="$(echo "$vm_stat_out" | grep "Pages active" | sed 's/[^0-9]//g')"
+    local inactive="$(echo "$vm_stat_out" | grep "Pages inactive" | sed 's/[^0-9]//g')"
+    local speculative="$(echo "$vm_stat_out" | grep "Pages speculative" | sed 's/[^0-9]//g')"
+    local wired="$(echo "$vm_stat_out" | grep "Pages wired down" | sed 's/[^0-9]//g')"
+    local compressed="$(echo "$vm_stat_out" | grep "Pages occupied by compressor" | sed 's/[^0-9]//g')"
 
-    total_mem=$(echo "scale=1;\
+    local total_mem=$(echo "scale=1;\
         ($free + $active + $inactive + $speculative + $wired + $compressed) *\
         $page_size / 1024 / 1024" | bc)
 
-    used_mem=$(echo "scale=1;\
+    local used_mem=$(echo "scale=1;\
         ($active + $wired) * $page_size / 1024 / 1024" | bc)
 
-    cpu_row="$(echo "$top_out" | grep "CPU usage" | tail -n 1)"
+    local cpu_row="$(echo "$top_out" | grep "CPU usage" | tail -n 1)"
 
-    cpu_user="$(echo "$cpu_row" | awk '{print $3}' | sed 's/%//')"
-    cpu_sys="$(echo "$cpu_row" | awk '{print $5}' | sed 's/%//')"
+    local cpu_user="$(echo "$cpu_row" | awk '{print $3}' | sed 's/%//')"
+    local cpu_sys="$(echo "$cpu_row" | awk '{print $5}' | sed 's/%//')"
 
-    cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
+    local cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
 
     echo "$total_mem $used_mem $cpu_percent"
 }
@@ -156,6 +157,8 @@ get_stats_macos() {
 # Output a unicode bar representing $1 out of 100. The bar will be colorized
 # according to $COLORS.
 bar() {
+    local b
+
     if [ "$(echo "$1 <= 12.5" | bc)" = "1" ] ; then
         b=▁
     elif [ "$(echo "$1 <= 25" | bc)" = "1" ] ; then
@@ -183,6 +186,8 @@ bar() {
 
 # Wrap $2 in tmux styles, with the color determined by $1 out of 100.
 colorize_tmux() {
+    local color
+
     if [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
         color=green
     elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
