@@ -159,19 +159,19 @@ get_stats_macos() {
 bar() {
     local b
 
-    if [ "$(echo "$1 <= 12.5" | bc)" = "1" ] ; then
+    if [ "$(echo "$1 <= 18.75" | bc)" = "1" ] ; then
         b=▁
-    elif [ "$(echo "$1 <= 25" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 31.25" | bc)" = "1" ] ; then
         b=▂
-    elif [ "$(echo "$1 <= 37.5" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 43.75" | bc)" = "1" ] ; then
         b=▃
-    elif [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 56.25" | bc)" = "1" ] ; then
         b=▄
-    elif [ "$(echo "$1 <= 62.5" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 68.75" | bc)" = "1" ] ; then
         b=▅
-    elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 81.25" | bc)" = "1" ] ; then
         b=▆
-    elif [ "$(echo "$1 <= 87.5" | bc)" = "1" ] ; then
+    elif [ "$(echo "$1 <= 93.75" | bc)" = "1" ] ; then
         b=▇
     else
         b=█
