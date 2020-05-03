@@ -35,7 +35,7 @@ main() {
         exit 1
     fi
 
-    parse_options $@
+    parse_options "$@"
 
     local n=0
     while [ -z "$NUM_ITERS" ] || [ "$n" -lt "$NUM_ITERS" ]; do
@@ -199,5 +199,5 @@ colorize_tmux() {
     echo "#[fg=$color,bold]$2#[fg=default,default]"
 }
 
-main $@
+main "$@"
 
