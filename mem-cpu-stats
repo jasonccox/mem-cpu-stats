@@ -41,12 +41,12 @@ main() {
     while [ -z "$NUM_ITERS" ] || [ "$n" -lt "$NUM_ITERS" ]; do
         local stats="$(get_stats)"
 
-        local total_mem="$(echo "$stats" | awk '{print $1}')"
-        local used_mem="$(echo "$stats" | awk '{print $2}')"
-        local cpu_percent="$(echo "$stats" | awk '{print $3}')"
+        local total_mem="$(awk '{print $1}' <<< "$stats")"
+        local used_mem="$(awk '{print $2}' <<< "$stats")"
+        local cpu_percent="$(awk '{print $3}' <<< "$stats")"
 
-        local used_mem_gb="$(echo "scale=1; $used_mem / 1024" | bc)"
-        local mem_percent="$(echo "scale=1; $used_mem * 100 / $total_mem" | bc)"
+        local used_mem_gb="$(bc <<< "scale=1; $used_mem / 1024")"
+        local mem_percent="$(bc <<< "scale=1; $used_mem * 100 / $total_mem")"
 
         local used_mem_fmt="$(printf '%*.1f' $MEM_WIDTH $used_mem_gb)"
         local cpu_percent_fmt="$(printf '%*.1f' $CPU_WIDTH $cpu_percent)"
@@ -111,16 +111,16 @@ get_stats() {
 get_stats_linux() {
     local top_out="$(top -b -n 2 -d 1 -w 512)"
 
-    local mem_row="$(echo "$top_out" | grep "MiB Mem" | tail -n 1)"
-    local cpu_row="$(echo "$top_out" | grep "%Cpu(s)" | tail -n 1)"
+    local mem_row="$(grep "MiB Mem" <<< "$top_out" | tail -n 1)"
+    local cpu_row="$(grep "%Cpu(s)" <<< "$top_out" | tail -n 1)"
 
-    local total_mem="$(echo "$mem_row" | awk '{print $4}')"
-    local used_mem="$(echo "$mem_row" | awk '{print $8}')"
+    local total_mem="$(awk '{print $4}' <<< "$mem_row")"
+    local used_mem="$(awk '{print $8}' <<< "$mem_row")"
 
-    local cpu_user="$(echo "$cpu_row" | awk '{print $2}')"
-    local cpu_sys="$(echo "$cpu_row" | awk '{print $4}')"
+    local cpu_user="$(awk '{print $2}' <<< "$cpu_row")"
+    local cpu_sys="$(awk '{print $4}' <<< "$cpu_row")"
 
-    local cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
+    local cpu_percent="$(bc <<< "scale=1; $cpu_user + $cpu_sys")"
 
     echo "$total_mem $used_mem $cpu_percent"
 }
@@ -129,27 +129,27 @@ get_stats_macos() {
     local top_out="$(top -l 2 -i 1 -n 0)"
     local vm_stat_out="$(vm_stat)"
 
-    local page_size="$(echo "$vm_stat_out" | grep "page size of" | sed 's/[^0-9]//g')"
-    local free="$(echo "$vm_stat_out" | grep "Pages free" | sed 's/[^0-9]//g')"
-    local active="$(echo "$vm_stat_out" | grep "Pages active" | sed 's/[^0-9]//g')"
-    local inactive="$(echo "$vm_stat_out" | grep "Pages inactive" | sed 's/[^0-9]//g')"
-    local speculative="$(echo "$vm_stat_out" | grep "Pages speculative" | sed 's/[^0-9]//g')"
-    local wired="$(echo "$vm_stat_out" | grep "Pages wired down" | sed 's/[^0-9]//g')"
-    local compressed="$(echo "$vm_stat_out" | grep "Pages occupied by compressor" | sed 's/[^0-9]//g')"
+    local page_size="$(grep "page size of" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local free="$(grep "Pages free" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local active="$(grep "Pages active" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local inactive="$(grep "Pages inactive" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local speculative="$(grep "Pages speculative" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local wired="$(grep "Pages wired down" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
+    local compressed="$(grep "Pages occupied by compressor" <<< "$vm_stat_out" | sed 's/[^0-9]//g')"
 
-    local total_mem=$(echo "scale=1;\
+    local total_mem=$(bc <<< "scale=1;\
         ($free + $active + $inactive + $speculative + $wired + $compressed) *\
-        $page_size / 1024 / 1024" | bc)
+        $page_size / 1024 / 1024")
 
-    local used_mem=$(echo "scale=1;\
-        ($active + $wired) * $page_size / 1024 / 1024" | bc)
+    local used_mem=$(bc <<< "scale=1;\
+        ($active + $wired) * $page_size / 1024 / 1024")
 
-    local cpu_row="$(echo "$top_out" | grep "CPU usage" | tail -n 1)"
+    local cpu_row="$(grep "CPU usage" <<< "$top_out" | tail -n 1)"
 
-    local cpu_user="$(echo "$cpu_row" | awk '{print $3}' | sed 's/%//')"
-    local cpu_sys="$(echo "$cpu_row" | awk '{print $5}' | sed 's/%//')"
+    local cpu_user="$(awk '{print $3}' <<< "$cpu_row" | sed 's/%//')"
+    local cpu_sys="$(awk '{print $5}' <<< "$cpu_row" | sed 's/%//')"
 
-    local cpu_percent="$(echo "scale=1; $cpu_user + $cpu_sys" | bc)"
+    local cpu_percent="$(bc <<< "scale=1; $cpu_user + $cpu_sys")"
 
     echo "$total_mem $used_mem $cpu_percent"
 }
@@ -159,19 +159,19 @@ get_stats_macos() {
 bar() {
     local b
 
-    if [ "$(echo "$1 <= 18.75" | bc)" = "1" ] ; then
+    if [ "$(bc <<< "$1 <= 18.75")" = "1" ] ; then
         b=▁
-    elif [ "$(echo "$1 <= 31.25" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 31.25")" = "1" ] ; then
         b=▂
-    elif [ "$(echo "$1 <= 43.75" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 43.75")" = "1" ] ; then
         b=▃
-    elif [ "$(echo "$1 <= 56.25" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 56.25")" = "1" ] ; then
         b=▄
-    elif [ "$(echo "$1 <= 68.75" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 68.75")" = "1" ] ; then
         b=▅
-    elif [ "$(echo "$1 <= 81.25" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 81.25")" = "1" ] ; then
         b=▆
-    elif [ "$(echo "$1 <= 93.75" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 93.75")" = "1" ] ; then
         b=▇
     else
         b=█
@@ -188,9 +188,9 @@ bar() {
 colorize_tmux() {
     local color
 
-    if [ "$(echo "$1 <= 50" | bc)" = "1" ] ; then
+    if [ "$(bc <<< "$1 <= 50")" = "1" ] ; then
         color=green
-    elif [ "$(echo "$1 <= 75" | bc)" = "1" ] ; then
+    elif [ "$(bc <<< "$1 <= 75")" = "1" ] ; then
         color=yellow
     else
         color=red
