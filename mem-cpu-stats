@@ -39,11 +39,11 @@ main() {
 
     local n=0
     while [ -z "$NUM_ITERS" ] || [ "$n" -lt "$NUM_ITERS" ]; do
-        local stats="$(get_stats)"
+        local stats=($(get_stats))
 
-        local total_mem="$(awk '{print $1}' <<< "$stats")"
-        local used_mem="$(awk '{print $2}' <<< "$stats")"
-        local cpu_percent="$(awk '{print $3}' <<< "$stats")"
+        local total_mem="${stats[0]}"
+        local used_mem="${stats[1]}"
+        local cpu_percent="${stats[2]}"
 
         local used_mem_gb="$(bc <<< "scale=1; $used_mem / 1024")"
         local mem_percent="$(bc <<< "scale=1; $used_mem * 100 / $total_mem")"
@@ -111,14 +111,14 @@ get_stats() {
 get_stats_linux() {
     local top_out="$(top -b -n 2 -d 1 -w 512)"
 
-    local mem_row="$(grep "MiB Mem" <<< "$top_out" | tail -n 1)"
-    local cpu_row="$(grep "%Cpu(s)" <<< "$top_out" | tail -n 1)"
+    local mem_row=($(grep "MiB Mem" <<< "$top_out" | tail -n 1))
+    local cpu_row=($(grep "%Cpu(s)" <<< "$top_out" | tail -n 1))
 
-    local total_mem="$(awk '{print $4}' <<< "$mem_row")"
-    local used_mem="$(awk '{print $8}' <<< "$mem_row")"
+    local total_mem="${mem_row[3]}"
+    local used_mem="${mem_row[7]}"
 
-    local cpu_user="$(awk '{print $2}' <<< "$cpu_row")"
-    local cpu_sys="$(awk '{print $4}' <<< "$cpu_row")"
+    local cpu_user="${cpu_row[1]}"
+    local cpu_sys="${cpu_row[3]}"
 
     local cpu_percent="$(bc <<< "scale=1; $cpu_user + $cpu_sys")"
 
@@ -144,10 +144,10 @@ get_stats_macos() {
     local used_mem=$(bc <<< "scale=1;\
         ($active + $wired) * $page_size / 1024 / 1024")
 
-    local cpu_row="$(grep "CPU usage" <<< "$top_out" | tail -n 1)"
+    local cpu_row=($(grep "CPU usage" <<< "$top_out" | tail -n 1))
 
-    local cpu_user="$(awk '{print $3}' <<< "$cpu_row" | sed 's/%//')"
-    local cpu_sys="$(awk '{print $5}' <<< "$cpu_row" | sed 's/%//')"
+    local cpu_user="${cpu_row[2]%\%}"
+    local cpu_sys="${cpu_row[4]%\%}"
 
     local cpu_percent="$(bc <<< "scale=1; $cpu_user + $cpu_sys")"
 
