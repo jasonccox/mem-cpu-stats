@@ -24,7 +24,7 @@ The following options are supported:
     -m | --mem-width WIDTH     Display the memory usage number with at least
                                WIDTH characters. Default 3.
     -n | --num-iters NUM       Exit after NUM intervals. An empty value is
-                               interpreted as infinity. Default infinity.
+                               interpreted as infinity. Default 1.
     -p | --cpu-width WIDTH     Display the CPU usage number with at least WIDTH
                                characters. Default 4.
 ```
@@ -35,4 +35,4 @@ To use `mem-cpu-stats` in your tmux status bar (with colors!), add the following
 set -g status-right "#(/path/to/mem-cpu-stats -c tmux)"
 ```
 
-> In creating this, I discovered that you can have something in your tmux status bar that updates more often than `status-interval` by printing a new line at the desired interval. What's more, tmux will kill the process and start a new one every time it refreshes the status bar. `mem-cpu-stats` takes advantage of this to update itself as often as it wants.
+> In creating this, I discovered that you can have something in your tmux status bar that updates more often than `status-interval` by printing a new line at the desired interval. What's more, tmux will kill the process and start a new one every time it refreshes the status bar. `mem-cpu-stats` takes advantage of this to update itself as often as it wants. However, this will cause the *entire* status bar to update at the same interval as `mem-cpu-stats`.

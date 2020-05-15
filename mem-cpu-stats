@@ -7,7 +7,7 @@
 MEM_WIDTH=3
 CPU_WIDTH=4
 INTERVAL=5
-NUM_ITERS=
+NUM_ITERS=1
 COLORS=
 
 usage() {
@@ -22,7 +22,7 @@ Available OPTIONS:
     -m | --mem-width WIDTH     Display the memory usage number with at least
                                WIDTH characters. Default 3.
     -n | --num-iters NUM       Exit after NUM intervals. An empty value is
-                               interpreted as infinity. Default infinity.
+                               interpreted as infinity. Default 1.
     -p | --cpu-width WIDTH     Display the CPU usage number with at least WIDTH
                                characters. Default 4.
 "
@@ -38,7 +38,7 @@ main() {
     parse_options "$@"
 
     local n=0
-    while [ -z "$NUM_ITERS" ] || [ "$n" -lt "$NUM_ITERS" ]; do
+    while true; do
         local stats=($(get_stats))
 
         local total_mem="${stats[0]}"
@@ -57,6 +57,11 @@ main() {
         echo "$mem_out  $cpu_out"
 
         n="$((n + 1))"
+
+        if [ -n "$NUM_ITERS" ] && [ "$n" -ge "$NUM_ITERS" ]; then
+            break
+        fi
+
         sleep $(($INTERVAL - 1)) # subtract 1 because top takes 1 second
     done
 }
